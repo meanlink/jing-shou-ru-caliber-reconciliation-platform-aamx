@@ -7,6 +7,7 @@ from src.config.settings import REDIS_URL
 from src.models import Job, Dataset, Report
 from src.services.business import analyze
 from src.services.reports import deliver
+from src.services.reconciliation import resume_incomplete_merges
 from src.services.audit import record
 logging.basicConfig(level=logging.INFO)
 def execute(job_id):
@@ -41,6 +42,10 @@ def main():
         for j in db.scalars(select(Job).where(Job.status=='running')):
             j.status='queued';record(db,'worker','job.recovered',{'id':j.id})
         db.commit()
+    # Resume reconciliation merges interrupted by a crash instead of stranding them.
+    with Session() as db:
+        try: resume_incomplete_merges(db)
+        except Exception: logging.exception('Merge recovery failed')
     while True:
         Path('/tmp/heartbeat').touch()
         try:

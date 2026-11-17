@@ -100,6 +100,49 @@ def _divide(left, right, policy, warnings):
     return value, unit
 
 
+def validate_ledger(records):
+    """Validate a complete ledger against the analysis contract.
+
+    Returns human-readable issues; an empty list means the ledger can be
+    published as an analyzable batch.  Rules mirror :func:`analyze`.
+    """
+    issues = []
+    if not isinstance(records, list) or not records:
+        return ["合并后账本为空"]
+    natural_keys, currencies = set(), set()
+    for index, record in enumerate(records):
+        line = index + 1
+        if not isinstance(record, dict):
+            issues.append(f"第 {line} 行不是对象")
+            continue
+        missing = [key for key in ("day", "channel", "currency", *sorted(FIELDS)) if key not in record or record[key] in (None, "")]
+        if missing:
+            issues.append(f"第 {line} 行缺少字段：{'、'.join(missing)}")
+            continue
+        try:
+            day = date.fromisoformat(str(record["day"]))
+            channel = str(record["channel"]).strip()
+            currency = str(record["currency"])
+            values = {key: float(record[key]) for key in FIELDS}
+        except (TypeError, ValueError):
+            issues.append(f"第 {line} 行日期、币种或数值字段格式无效")
+            continue
+        if not channel:
+            issues.append(f"第 {line} 行渠道为空")
+        if not all(math.isfinite(value) and 0 <= value <= 1_000_000_000 for value in values.values()):
+            issues.append(f"第 {line} 行金额或访问数必须为0至10亿之间的有限数值")
+        if not values["visits"].is_integer():
+            issues.append(f"第 {line} 行访问数必须为整数")
+        key = (str(day), channel)
+        if key in natural_keys:
+            issues.append(f"第 {line} 行自然键重复：{day} / {channel}")
+        natural_keys.add(key)
+        currencies.add(currency)
+    if currencies - {"CNY"}:
+        issues.append("存在非CNY币种，可分析批次只接受统一CNY")
+    return issues[:50]
+
+
 def analyze(records, params):
     if not isinstance(records, list) or not records:
         raise ValueError("请先导入渠道日汇总账")

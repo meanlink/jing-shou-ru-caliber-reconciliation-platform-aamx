@@ -3,8 +3,9 @@
 业务报表与指标口径的真实业务分析小型项目。完整模拟客户、痛点、上下游、算法公式与一天工作剧本见 [BUSINESS.md](BUSINESS.md)。
 
 ## 模块与业务流程
-数据接入（JSON/CSV、字段验证、批次指纹）→ 参数化分析（异步 Python worker）→ 结果复核（指标、图形、明细、解释、批准）→ 定时分发（本地收件箱、CSV/JSON、SHA256）；另有业务总览和审计轨迹。
-三个贯穿全栈的实体：Dataset 数据批次、Job 分析任务、Report 分发计划；辅助 User、Audit、Delivery。
+数据接入（JSON/CSV、字段验证、批次指纹）→ 参数化分析（异步 Python worker）→ 结果复核（指标、图形、明细、解释、批准）→ 定时分发（本地收件箱、CSV/JSON、SHA256）；另有业务总览、两侧校账和审计轨迹。
+三个贯穿全栈的实体：Dataset 数据批次、Job 分析任务、Report 分发计划；两侧校账另用 ReconciliationCase/Merge/Adjudication/Publish 记录共同底账、两侧副本、逐格合并、裁决与结案批次；辅助 User、Audit、Delivery。
+两侧校账：从源账建立共同底账与财务/渠道副本，整表提交但逐格三方合并；同格异改与删改相撞交负责人裁决，副本再改令旧裁决失效，过期合并拒绝发布，无冲突且全账有效才结案并生成新的可分析批次（重复发布幂等）。原账与既有分析不变。
 
 ## 快速启动
 ```bash
@@ -13,7 +14,7 @@ docker compose up -d --build --wait
 docker compose exec -T backend python -m scripts.seed_demo
 ```
 访问 http://localhost:18217；后端文档 http://localhost:19217/docs；数据库宿主端口 17717。
-`SEED_DEMO=true` 自动幂等 seed；不覆盖用户修改。手动 seed 命令可重复执行。
+`SEED_DEMO=true` 自动幂等 seed；不覆盖用户修改。手动 seed 命令可重复执行。校账中断后的未完成合并会在 worker 启动时自动恢复，也可在页面点“恢复未完合并”。
 
 ## 演示账号与权限
 |账号|密码|真实权限|
@@ -29,7 +30,7 @@ Python 3.12 / FastAPI / SQLAlchemy / NumPy / SciPy / scikit-learn；MySQL 8.0；
 ## 目录与工程约定
 backend/src/{models,schemas,services,routes,controllers,middlewares,constants,config,utils}；backend/scripts/seed_demo.py；backend/migrations/initial.py。
 frontend/src/{api,stores,types,components/common,hooks,pages,router,utils,constants}。
-Role 枚举：admin/analyst/viewer；JobStatus：queued/running/completed/failed。后端 backend/src/constants/enums.py，前端 frontend/src/constants/enums.js；路由权限在 middlewares/auth.py；页面按相同角色控制操作入口。
+Role 枚举：admin/analyst/viewer；JobStatus：queued/running/completed/failed；校账状态：open/ready/closed（对外另有 conflict/stale 展示态）。后端 backend/src/constants/enums.py，前端 frontend/src/constants/enums.js；路由权限在 middlewares/auth.py；页面按相同角色控制操作入口。
 
 ## 环境变量与 Docker
 COMPOSE_PROJECT_NAME=metric-contract；FRONTEND_PORT=18217；BACKEND_PORT=19217；DB_PORT=17717；DB_PASSWORD、JWT_SECRET 见 .env.example；SEED_DEMO 默认 true。共享命名产物卷供后端下载与 worker 写入，数据库/Redis 各持久卷。

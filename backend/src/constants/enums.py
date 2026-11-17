@@ -8,3 +8,17 @@ class JobStatus(str, Enum):
     running = 'running'
     completed = 'completed'
     failed = 'failed'
+class ReconciliationStatus(str, Enum):
+    open = 'open'
+    ready = 'ready'
+    closed = 'closed'
+class MergeStatus(str, Enum):
+    running = 'running'
+    completed = 'completed'
+    failed = 'failed'
+class ConflictKind(str, Enum):
+    cell = 'cell'
+    delete_modify = 'delete_modify'
+class AdjudicationStatus(str, Enum):
+    active = 'active'
+    voided = 'voided'
